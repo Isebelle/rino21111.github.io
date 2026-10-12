@@ -23,7 +23,7 @@
     margin: 0;
     min-height: 100vh;
     color: var(--ink);
-    font: 16px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 15px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
     background-color: var(--wall);
     background-image:
       radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 252, 225, .55), transparent 70%),
@@ -59,8 +59,9 @@
   }
   .grid li { flex: 1 1 145px; max-width: 170px; }
   .card {
-    display: flex; flex-direction: column; align-items: center; gap: 14px;
-    padding: 26px 16px 20px;
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 104px; padding: 18px 14px 26px;
     border: 1px solid rgba(90, 74, 20, .28);
     border-radius: 6px;
     background: rgba(242, 231, 168, .5);
@@ -74,14 +75,11 @@
     background: rgba(250, 243, 195, .7);
     box-shadow: 0 1px 0 rgba(255, 252, 225, .7) inset, 0 14px 30px rgba(70, 55, 0, .22), 0 0 0 1px rgba(90, 74, 20, .35);
   }
-  .icon {
-    width: 88px; height: 88px; border-radius: 10px;
-    display: grid; place-items: center;
-    background: var(--tile); color: var(--line);
-    box-shadow: 0 2px 0 rgba(60, 48, 10, .25);
+  .card h2 { margin: 0; font-size: 16px; font-weight: 600; text-align: center; }
+  .owner {
+    position: absolute; right: 10px; bottom: 7px;
+    font-size: 11px; color: rgba(59, 50, 20, .45);
   }
-  .icon svg { width: 54px; height: 54px; }
-  .card h2 { margin: 0; font-size: 17px; font-weight: 600; text-align: center; }
 </style>
 </head>
 <body>
@@ -91,40 +89,19 @@
 </main>
 
 <script>
-  // To add an app: add an entry here. `icon` is inline SVG on a 40x40 box,
-  // drawn in currentColor (the line colour) with var(--tile) for cut-outs.
+  // To add an app: add an entry here. `owner` shows in the card's corner.
   const APPS = [
-    {
-      name: "progressions",
-      url: "/progressions/",
-      icon: `<svg viewBox="0 0 40 40">
-        <g transform="rotate(35 20 20)" fill="currentColor">
-          <rect x="17.5" y="1" width="5" height="6" rx="1.5"/>
-          <rect x="18.8" y="5" width="2.4" height="15"/>
-          <circle cx="20" cy="22" r="6.2"/><circle cx="20" cy="30.5" r="8"/>
-          <circle cx="20" cy="24.5" r="2.4" fill="var(--tile)"/>
-          <rect x="16.5" y="31.5" width="7" height="1.8" rx=".9" fill="var(--tile)"/>
-        </g>
-      </svg>`,
-    },
-    {
-      name: "Chrono Trader",
-      url: "/chrono_trader/",
-      icon: `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10 4h20M10 36h20"/>
-        <path d="M12.5 4c0 9 6 10 6 16s-6 7-6 16M27.5 4c0 9-6 10-6 16s6 7 6 16"/>
-        <path d="M15 10h10l-5 7z" fill="currentColor" stroke-width="1"/>
-        <path d="M14.5 34l4-4 2.5 2 5-5" stroke-width="2"/>
-      </svg>`,
-    },
+    { name: "progressions", url: "/progressions/", owner: "rino21111" },
+    { name: "Chrono Trader", url: "/chrono_trader/", owner: "rino21111" },
   ];
 
   const grid = document.getElementById("apps");
   for (const app of APPS) {
     const li = document.createElement("li");
-    li.innerHTML = `<a class="card"><div class="icon">${app.icon}</div><h2></h2></a>`;
+    li.innerHTML = `<a class="card"><h2></h2><span class="owner"></span></a>`;
     li.querySelector("a").href = app.url;
     li.querySelector("h2").textContent = app.name;
+    li.querySelector(".owner").textContent = app.owner;
     grid.append(li);
   }
 </script>
