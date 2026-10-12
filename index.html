@@ -55,9 +55,9 @@
   }
   .grid {
     list-style: none; margin: 0; padding: 0;
-    display: grid; gap: 20px;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 170px)); justify-content: center;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 16px;
   }
+  .grid li { flex: 0 1 170px; min-width: 145px; }
   .card {
     display: flex; flex-direction: column; align-items: center; gap: 14px;
     padding: 26px 16px 20px;
