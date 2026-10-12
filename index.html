@@ -3,106 +3,117 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>The Arcade</title>
-<meta name="description" content="A little shelf of browser toys: guitar theory, time-travel trading, and whatever comes next.">
-<meta property="og:title" content="The Arcade">
-<meta property="og:description" content="A little shelf of browser toys: guitar theory, time-travel trading, and whatever comes next.">
+<title>beehive</title>
+<meta property="og:title" content="beehive">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://rino21111.github.io/">
-<meta name="theme-color" content="#5865f2">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕹️</text></svg>">
+<meta name="theme-color" content="#cdbb62">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐝</text></svg>">
 <style>
   :root {
-    --bg: #f6f4ef;
-    --ink: #1d1b22;
-    --muted: #6b6775;
-    --card: #ffffff;
-    --line: #e4e0d8;
-    --shadow: 0 1px 2px rgba(20,16,30,.06), 0 8px 24px rgba(20,16,30,.06);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #15141a;
-      --ink: #f1eff6;
-      --muted: #a29eae;
-      --card: #1f1d26;
-      --line: #2e2b38;
-      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
-    }
+    color-scheme: light;
+    --wall: #cdbb62;
+    --ink: #3b3214;
+    --tile: #a8933c;
+    --line: #f4ebb8;
   }
   * { box-sizing: border-box; }
+  html { min-height: 100%; }
   body {
     margin: 0;
-    background: var(--bg);
+    min-height: 100vh;
     color: var(--ink);
-    font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 16px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background-color: var(--wall);
+    background-image:
+      radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 252, 225, .55), transparent 70%),
+      radial-gradient(ellipse 120% 60% at 50% 115%, rgba(70, 55, 5, .35), transparent 70%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='64'%3E%3Cg fill='none' stroke='%23826c1e' stroke-opacity='.22'%3E%3Cpath d='M1 0v64M47 0v64'/%3E%3Cpath d='M24 8l7 8-7 8-7-8z'/%3E%3Cpath d='M24 40l7 8-7 8-7-8z' stroke-opacity='.12'/%3E%3C/g%3E%3C/svg%3E");
+    background-attachment: fixed, fixed, scroll;
   }
-  main { max-width: 960px; margin: 0 auto; padding: 56px 16px 64px; }
-  header { margin-bottom: 36px; }
-  h1 { font-size: clamp(32px, 6vw, 48px); line-height: 1.1; margin: 0 0 8px; letter-spacing: -0.02em; }
-  header p { margin: 0; color: var(--muted); font-size: 18px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  /* the fluorescent hum: a faint wash that dips now and then */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    background: rgba(255, 255, 235, .07);
+    animation: flicker 9s infinite;
+  }
+  @keyframes flicker {
+    0%, 91%, 93%, 95.5%, 100% { opacity: 1; }
+    92% { opacity: .2; }
+    95% { opacity: .5; }
+  }
+  @media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+
+  main { max-width: 880px; margin: 0 auto; padding: 40px 16px 64px; }
+  .mark {
+    margin: 0 0 40px;
+    font-size: 14px; font-weight: 500; letter-spacing: .25em;
+    color: rgba(59, 50, 20, .4);
+    text-align: center;
+  }
+  .grid {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 170px)); justify-content: center;
+  }
   .card {
-    display: flex; flex-direction: column; gap: 14px;
-    padding: 22px; border-radius: 18px;
-    background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow);
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    padding: 26px 16px 20px;
+    border: 1px solid rgba(90, 74, 20, .28);
+    border-radius: 6px;
+    background: rgba(242, 231, 168, .5);
+    box-shadow: 0 1px 0 rgba(255, 252, 225, .6) inset, 0 10px 24px rgba(70, 55, 0, .16);
     color: inherit; text-decoration: none;
-    transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    transition: transform .15s ease, background-color .15s ease, box-shadow .15s ease;
   }
-  .card:hover, .card:focus-visible { transform: translateY(-3px); border-color: var(--accent); outline: none; }
-  .card:hover .icon, .card:focus-visible .icon { transform: rotate(-6deg) scale(1.05); }
+  .card:hover, .card:focus-visible {
+    outline: none;
+    transform: translateY(-3px);
+    background: rgba(250, 243, 195, .7);
+    box-shadow: 0 1px 0 rgba(255, 252, 225, .7) inset, 0 14px 30px rgba(70, 55, 0, .22), 0 0 0 1px rgba(90, 74, 20, .35);
+  }
   .icon {
-    width: 64px; height: 64px; border-radius: 16px; flex: none;
+    width: 88px; height: 88px; border-radius: 10px;
     display: grid; place-items: center;
-    background: var(--accent);
-    transition: transform .2s ease;
+    background: var(--tile); color: var(--line);
+    box-shadow: 0 2px 0 rgba(60, 48, 10, .25);
   }
-  .icon svg { width: 40px; height: 40px; }
-  .card h2 { margin: 0; font-size: 21px; }
-  .card p { margin: 0; color: var(--muted); }
-  .go { margin-top: auto; font-weight: 600; color: var(--accent); }
-  .soon { border-style: dashed; box-shadow: none; background: transparent; pointer-events: none; }
-  .soon .icon { background: var(--line); }
-  footer { margin-top: 48px; color: var(--muted); font-size: 14px; }
+  .icon svg { width: 54px; height: 54px; }
+  .card h2 { margin: 0; font-size: 17px; font-weight: 600; text-align: center; }
 </style>
 </head>
 <body>
 <main>
-  <header>
-    <h1>🕹️ The Arcade</h1>
-    <p>A little shelf of browser toys. Pick one and play.</p>
-  </header>
-  <div class="grid" id="apps"></div>
-  <footer>Everything runs in your browser. Nothing to install, no sign-up.</footer>
+  <p class="mark">beehive</p>
+  <ul class="grid" id="apps"></ul>
 </main>
 
 <script>
-  // To add an app: add an entry here. `icon` is inline SVG drawn on a 40x40 box.
+  // To add an app: add an entry here. `icon` is inline SVG on a 40x40 box,
+  // drawn in currentColor (the line colour) with var(--tile) for cut-outs.
   const APPS = [
     {
       name: "progressions",
       url: "/progressions/",
-      blurb: "Play with guitar chords on a live fretboard, build progressions, and hear why they work.",
-      accent: "#e8763a",
       icon: `<svg viewBox="0 0 40 40">
-        <g transform="rotate(35 20 20)" fill="#fff">
+        <g transform="rotate(35 20 20)" fill="currentColor">
           <rect x="17.5" y="1" width="5" height="6" rx="1.5"/>
           <rect x="18.8" y="5" width="2.4" height="15"/>
           <circle cx="20" cy="22" r="6.2"/><circle cx="20" cy="30.5" r="8"/>
-          <circle cx="20" cy="24.5" r="2.4" fill="var(--accent)"/>
-          <rect x="16.5" y="31.5" width="7" height="1.8" rx=".9" fill="var(--accent)"/>
+          <circle cx="20" cy="24.5" r="2.4" fill="var(--tile)"/>
+          <rect x="16.5" y="31.5" width="7" height="1.8" rx=".9" fill="var(--tile)"/>
         </g>
       </svg>`,
     },
     {
       name: "Chrono Trader",
       url: "/chrono_trader/",
-      blurb: "Glimpse tomorrow's headlines before the market does, then trade before the price catches up.",
-      accent: "#7c5cff",
-      icon: `<svg viewBox="0 0 40 40" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      icon: `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
         <path d="M10 4h20M10 36h20"/>
         <path d="M12.5 4c0 9 6 10 6 16s-6 7-6 16M27.5 4c0 9-6 10-6 16s6 7 6 16"/>
-        <path d="M15 10h10l-5 7z" fill="#fff" stroke-width="1"/>
+        <path d="M15 10h10l-5 7z" fill="currentColor" stroke-width="1"/>
         <path d="M14.5 34l4-4 2.5 2 5-5" stroke-width="2"/>
       </svg>`,
     },
@@ -110,20 +121,12 @@
 
   const grid = document.getElementById("apps");
   for (const app of APPS) {
-    const a = document.createElement("a");
-    a.className = "card";
-    a.href = app.url;
-    a.style.setProperty("--accent", app.accent);
-    a.innerHTML = `<div class="icon">${app.icon}</div>
-      <h2></h2><p></p><span class="go">Play →</span>`;
-    a.querySelector("h2").textContent = app.name;
-    a.querySelector("p").textContent = app.blurb;
-    grid.append(a);
+    const li = document.createElement("li");
+    li.innerHTML = `<a class="card"><div class="icon">${app.icon}</div><h2></h2></a>`;
+    li.querySelector("a").href = app.url;
+    li.querySelector("h2").textContent = app.name;
+    grid.append(li);
   }
-  const soon = document.createElement("div");
-  soon.className = "card soon";
-  soon.innerHTML = `<div class="icon"></div><h2>More soon</h2><p>Something new is always on the workbench.</p>`;
-  grid.append(soon);
 </script>
 </body>
 </html>
