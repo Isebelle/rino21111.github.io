@@ -16,6 +16,8 @@
     --ink: #3b3214;
     --tile: #a8933c;
     --line: #f4ebb8;
+    --bee-gold: #f2c230;
+    --bee-dark: #2a2208;
   }
   * { box-sizing: border-box; }
   html { min-height: 100%; }
@@ -44,6 +46,12 @@
     92% { opacity: .2; }
     95% { opacity: .5; }
   }
+  @media (max-width: 420px) {
+    .head { width: 24px; height: 24px; }
+    .body { font-size: 11px; padding: 8px 28px 8px 14px; }
+    .wing { width: 26px; height: 19px; top: -17px; }
+    .wing.w1 { left: 28px; } .wing.w2 { left: 44px; }
+  }
   @media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
 
   main { max-width: 880px; margin: 0 auto; padding: 40px 16px 64px; }
@@ -57,11 +65,11 @@
     list-style: none; margin: 0; padding: 0;
     display: flex; flex-wrap: wrap; justify-content: center; gap: 16px;
   }
-  .grid li { flex: 1 1 145px; max-width: 170px; }
+  .grid li { flex: 1 1 160px; max-width: 220px; }
   .card {
     position: relative;
     display: flex; align-items: center; justify-content: center;
-    min-height: 104px; padding: 18px 14px 26px;
+    min-height: 116px; padding: 26px 6px 28px;
     border: 1px solid rgba(90, 74, 20, .28);
     border-radius: 6px;
     background: rgba(242, 231, 168, .5);
@@ -75,7 +83,80 @@
     background: rgba(250, 243, 195, .7);
     box-shadow: 0 1px 0 rgba(255, 252, 225, .7) inset, 0 14px 30px rgba(70, 55, 0, .22), 0 0 0 1px rgba(90, 74, 20, .35);
   }
-  .card h2 { margin: 0; font-size: 16px; font-weight: 600; text-align: center; }
+  /* each app is a bee: drifts around its card, jerks between poses, wings a blur */
+  .wander { display: inline-block; animation: wander var(--wd, 4s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
+  .bee {
+    position: relative; display: inline-flex; align-items: center;
+    animation: jitter .55s steps(1, end) infinite; animation-delay: var(--delay, 0s);
+  }
+  .card:hover .bee, .card:focus-visible .bee { animation-duration: .22s; }
+  .head {
+    position: relative; z-index: 2; flex: none;
+    width: 28px; height: 28px; margin-right: -9px;
+    border-radius: 50%; background: var(--bee-dark);
+  }
+  .head::before { /* antenna */
+    content: ""; position: absolute; left: 8px; top: -11px;
+    width: 13px; height: 12px;
+    border: 2px solid var(--bee-dark); border-color: var(--bee-dark) transparent transparent var(--bee-dark);
+    border-radius: 10px 0 0 0; transform: rotate(18deg);
+  }
+  .head::after { /* eye */
+    content: ""; position: absolute; left: 6px; top: 9px;
+    width: 7px; height: 7px; border-radius: 50%; background: #fffbe6;
+  }
+  .body {
+    position: relative; z-index: 1;
+    margin: 0; padding: 10px 32px 10px 17px;
+    font-size: 13px; font-weight: 700; line-height: 1.2; white-space: nowrap;
+    color: var(--bee-dark);
+    border: 2px solid var(--bee-dark); border-radius: 999px;
+    background:
+      linear-gradient(90deg, transparent calc(100% - 25px), var(--bee-dark) 0 calc(100% - 19px),
+        transparent 0 calc(100% - 13px), var(--bee-dark) 0 calc(100% - 7px), transparent 0),
+      var(--bee-gold);
+  }
+  .body::after { /* stinger */
+    content: ""; position: absolute; right: -9px; top: 50%; margin-top: -4px;
+    border-left: 8px solid var(--bee-dark); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  }
+  .wing {
+    position: absolute; z-index: 3; top: -20px;
+    width: 30px; height: 22px; border-radius: 50%;
+    background: rgba(255, 255, 255, .7); border: 1.5px solid rgba(42, 34, 8, .45);
+    transform-origin: 50% 100%;
+    animation: flap .07s linear infinite alternate;
+  }
+  .wing.w1 { left: 32px; --r: -22deg; }
+  .wing.w2 { left: 50px; --r: 14deg; }
+  @keyframes flap {
+    from { transform: rotate(var(--r)) scaleY(1); }
+    to { transform: rotate(var(--r)) scaleY(.3); }
+  }
+  @keyframes jitter {
+    0%   { transform: translate(0, 0) rotate(0); }
+    14%  { transform: translate(2px, -2px) rotate(-5deg); }
+    29%  { transform: translate(-2px, 1px) rotate(4deg); }
+    43%  { transform: translate(1px, 2px) rotate(-2deg); }
+    57%  { transform: translate(-1px, -2px) rotate(6deg); }
+    71%  { transform: translate(3px, 1px) rotate(-3deg); }
+    86%  { transform: translate(-2px, -1px) rotate(2deg); }
+  }
+  @keyframes wander {
+    0%, 100% { transform: translate(-7px, -3px); }
+    25% { transform: translate(6px, 4px); }
+    50% { transform: translate(-3px, 5px); }
+    75% { transform: translate(7px, -4px); }
+  }
+  @media (max-width: 420px) {
+    .head { width: 24px; height: 24px; }
+    .body { font-size: 11px; padding: 8px 28px 8px 14px; }
+    .wing { width: 26px; height: 19px; top: -17px; }
+    .wing.w1 { left: 28px; } .wing.w2 { left: 44px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wander, .bee, .wing { animation: none; }
+  }
   .owner {
     position: absolute; right: 10px; bottom: 7px;
     font-size: 11px; color: rgba(59, 50, 20, .45);
@@ -96,14 +177,20 @@
   ];
 
   const grid = document.getElementById("apps");
-  for (const app of APPS) {
+  APPS.forEach((app, i) => {
     const li = document.createElement("li");
-    li.innerHTML = `<a class="card"><h2></h2><span class="owner"></span></a>`;
+    li.innerHTML = `<a class="card"><span class="wander"><span class="bee">
+        <span class="wing w1"></span><span class="wing w2"></span>
+        <span class="head"></span><h2 class="body"></h2>
+      </span></span><span class="owner"></span></a>`;
     li.querySelector("a").href = app.url;
-    li.querySelector("h2").textContent = app.name;
+    li.querySelector(".body").textContent = app.name;
     li.querySelector(".owner").textContent = app.owner;
+    const wander = li.querySelector(".wander");
+    wander.style.setProperty("--delay", `${-1.37 * i}s`);
+    wander.style.setProperty("--wd", `${3.6 + 0.9 * (i % 4)}s`);
     grid.append(li);
-  }
+  });
 </script>
 </body>
 </html>
