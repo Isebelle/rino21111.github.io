@@ -1,4 +1,4 @@
-# beehive
+# the beez rooms
 
 The landing page at https://rino21111.github.io/, linking to each browser app.
 
