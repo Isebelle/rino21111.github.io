@@ -66,7 +66,7 @@
     list-style: none; margin: 0; padding: 0;
     display: flex; flex-wrap: wrap; justify-content: center; gap: 16px;
   }
-  .grid li { flex: 1 1 160px; max-width: 220px; }
+  .grid li { flex: 1 1 160px; min-width: 0; max-width: 220px; }
   .card {
     position: relative;
     display: flex; flex-direction: column; align-items: center;
@@ -76,34 +76,38 @@
   }
   .card:focus-visible { outline: 1px dashed rgba(59, 50, 20, .5); outline-offset: 2px; }
 
-  /* each app is a bee hanging in the air, facing you: it drifts slowly around its spot,
-     rocks a little, and its wings are a fast shimmer. All motion is transform-only. */
-  .lift { display: block; transition: transform .6s cubic-bezier(.3, .7, .3, 1); }
-  .card:hover .lift, .card:focus-visible .lift { transform: translateY(-5px); }
-  .wander { display: block; animation: wander var(--wd, 7s) ease-in-out infinite; animation-delay: var(--delay, 0s); will-change: transform; }
+  /* each app is an abstract bee: its name is the body, banded dark and amber like
+     a bee, with glassy wings beating at its sides. It drifts slowly around its spot
+     and rocks a little. All motion is transform-only. */
+  .wander { display: inline-block; animation: wander var(--wd, 7s) ease-in-out infinite; animation-delay: var(--delay, 0s); }
   .bee {
-    position: relative; display: block;
-    width: 112px; height: 97px;
+    position: relative; display: inline-flex; align-items: center; gap: 2px;
     animation: hover 2.6s ease-in-out infinite; animation-delay: var(--delay, 0s);
-    transform-origin: 50% 40%;
   }
-  .bee svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
-  .bee .wing { will-change: transform; animation: flutter-l .13s linear infinite; transform-origin: 39.2% 36.5%; }
-  .bee .wing.r { animation-name: flutter-r; transform-origin: 60.8% 34.6%; animation-delay: -.05s; }
-  @keyframes flutter-l {
-    0%, 100% { transform: rotate(-15deg) scale(1, 1); opacity: .9; }
-    22% { transform: rotate(13deg) scale(.8, .92); opacity: .55; }
-    43% { transform: rotate(-6deg) scale(.95, 1); opacity: .8; }
-    61% { transform: rotate(16deg) scale(.76, .9); opacity: .5; }
-    80% { transform: rotate(-11deg) scale(.97, 1); opacity: .85; }
+  .card:hover .bee, .card:focus-visible .bee { animation-duration: 1.2s; }
+  .name {
+    margin: 0; font: inherit; font-size: 17px; font-weight: 800; letter-spacing: 0; line-height: 1.2;
+    white-space: nowrap;
+    background: repeating-linear-gradient(90deg, #231904 0 1ch, #8a5f00 1ch 2ch);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 0 1.5px rgba(255, 249, 222, .95)) drop-shadow(0 0 5px rgba(255, 246, 205, .55)) drop-shadow(0 3px 3px rgba(50, 36, 4, .3));
   }
-  @keyframes flutter-r {
-    0%, 100% { transform: rotate(15deg) scale(1, 1); opacity: .9; }
-    22% { transform: rotate(-13deg) scale(.8, .92); opacity: .55; }
-    43% { transform: rotate(6deg) scale(.95, 1); opacity: .8; }
-    61% { transform: rotate(-16deg) scale(.76, .9); opacity: .5; }
-    80% { transform: rotate(11deg) scale(.97, 1); opacity: .85; }
+  .wing { position: relative; flex: none; width: 24px; height: 32px; animation: flap-l .11s ease-in-out infinite alternate; transform-origin: 100% 45%; }
+  .wing.r { animation-name: flap-r; transform-origin: 0 45%; animation-delay: -.05s; }
+  .wing::before, .wing::after {
+    content: ""; position: absolute; border-radius: 50%;
+    background: linear-gradient(160deg, rgba(255, 255, 252, .7), rgba(236, 242, 232, .22) 70%);
+    border: 1px solid rgba(255, 255, 248, .8);
+    box-shadow: 0 0 0 .6px rgba(55, 42, 8, .4), 0 1px 3px rgba(55, 42, 8, .2);
   }
+  .wing::before { width: 24px; height: 16px; top: 0; }
+  .wing::after { width: 17px; height: 11px; top: 16px; }
+  .wing.l::before { right: 0; transform: rotate(18deg); }
+  .wing.l::after { right: 1px; transform: rotate(-16deg); }
+  .wing.r::before { left: 0; transform: rotate(-18deg); }
+  .wing.r::after { left: 1px; transform: rotate(16deg); }
+  @keyframes flap-l { from { transform: rotate(14deg) scaleY(1); } to { transform: rotate(-10deg) scaleY(.55); } }
+  @keyframes flap-r { from { transform: rotate(-14deg) scaleY(1); } to { transform: rotate(10deg) scaleY(.55); } }
   @keyframes hover {
     0%, 100% { transform: translateY(0) rotate(-1.5deg); }
     50% { transform: translateY(-2px) rotate(1.5deg); }
@@ -114,30 +118,21 @@
     50% { transform: translate(-2px, 5px); }
     75% { transform: translate(6px, -3px); }
   }
-  .name {
-    margin: 2px 0 0; font: inherit; font-size: 13px; font-weight: 500; letter-spacing: .03em;
-    white-space: nowrap;
-    color: rgba(46, 37, 10, .8);
-    text-shadow: 0 0 6px rgba(255, 248, 214, .6), 0 0 1px rgba(255, 248, 214, .5);
-    transition: color .3s ease;
-  }
   .owner {
-    align-self: flex-end; margin: 1px 8px 0 0;
+    align-self: flex-end; margin: 4px 8px 0 0;
     font-size: 11px; color: rgba(46, 37, 10, .6);
     text-shadow: 0 0 5px rgba(255, 248, 214, .5);
     opacity: 0; transform: translateY(-2px);
     transition: opacity .35s ease, transform .35s ease;
   }
-  .card:hover .name, .card:focus-visible .name { color: rgba(36, 28, 6, .95); }
   .card:hover .owner, .card:focus-visible .owner { opacity: 1; transform: none; }
-  .bee-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
   @media (max-width: 420px) {
-    .bee { width: 98px; height: 85px; }
-    .name { font-size: 12px; }
+    .grid { gap: 8px; }
+    .name { font-size: 13px; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .wander, .bee, .bee .wing { animation: none; }
-    .lift, .owner, .name { transition: none; }
+    .wander, .bee, .wing { animation: none; }
+    .owner { transition: none; }
   }
 </style>
 </head>
@@ -149,81 +144,6 @@
 <main>
   <p class="mark">the beez rooms</p>
   <ul class="grid" id="apps"></ul>
-  <svg class="bee-defs" aria-hidden="true" focusable="false">
-    <defs>
-      <!-- lit from above by the same warm tubes as the room -->
-      <radialGradient id="bz-thorax" cx=".44" cy=".26" r=".78">
-        <stop offset="0" stop-color="#f4dc8e"/>
-        <stop offset=".3" stop-color="#dcae48"/>
-        <stop offset=".68" stop-color="#a8762a"/>
-        <stop offset="1" stop-color="#4b3210"/>
-      </radialGradient>
-      <radialGradient id="bz-abd" cx=".4" cy=".22" r=".85">
-        <stop offset="0" stop-color="#f2d67e"/>
-        <stop offset=".4" stop-color="#d4a23e"/>
-        <stop offset=".8" stop-color="#94641f"/>
-        <stop offset="1" stop-color="#4e340e"/>
-      </radialGradient>
-      <radialGradient id="bz-shade" cx=".42" cy=".2" r=".9">
-        <stop offset=".45" stop-color="#1c1304" stop-opacity="0"/>
-        <stop offset="1" stop-color="#1c1304" stop-opacity=".6"/>
-      </radialGradient>
-      <radialGradient id="bz-head" cx=".46" cy=".22" r=".85">
-        <stop offset="0" stop-color="#6a5328"/>
-        <stop offset=".4" stop-color="#33250f"/>
-        <stop offset="1" stop-color="#130d04"/>
-      </radialGradient>
-      <radialGradient id="bz-eye" cx=".42" cy=".2" r=".9">
-        <stop offset="0" stop-color="#6b5a40"/>
-        <stop offset=".28" stop-color="#2e2416"/>
-        <stop offset=".7" stop-color="#0e0a05"/>
-        <stop offset="1" stop-color="#050302"/>
-      </radialGradient>
-      <linearGradient id="bz-wing" x1="0" y1="0" x2="1" y2=".35">
-        <stop offset="0" stop-color="#fffbea" stop-opacity=".62"/>
-        <stop offset=".45" stop-color="#eef0e6" stop-opacity=".36"/>
-        <stop offset=".75" stop-color="#f1dbe6" stop-opacity=".3"/>
-        <stop offset="1" stop-color="#d9ead9" stop-opacity=".26"/>
-      </linearGradient>
-      <radialGradient id="bz-pollen" cx=".4" cy=".3" r=".8">
-        <stop offset="0" stop-color="#f6c45a"/>
-        <stop offset=".6" stop-color="#d98a22"/>
-        <stop offset="1" stop-color="#8a4f0e"/>
-      </radialGradient>
-      <!-- hair: ragged edges plus a little light/dark fleck -->
-      <filter id="bz-fur" x="-25%" y="-25%" width="150%" height="150%" color-interpolation-filters="sRGB">
-        <feTurbulence type="fractalNoise" baseFrequency="1.15" numOctaves="2" seed="4" result="t"/>
-        <feDisplacementMap in="SourceGraphic" in2="t" scale="4.2" xChannelSelector="R" yChannelSelector="G" result="d"/>
-        <feColorMatrix in="t" type="matrix" values="0 0 0 0 .1  0 0 0 0 .07  0 0 0 0 .02  2.4 0 0 0 -1.3" result="dk"/>
-        <feComposite in="dk" in2="d" operator="in" result="dk2"/>
-        <feColorMatrix in="t" type="matrix" values="0 0 0 0 1  0 0 0 0 .95  0 0 0 0 .78  0 -2.4 0 0 1.05" result="lt"/>
-        <feComposite in="lt" in2="d" operator="in" result="lt2"/>
-        <feMerge><feMergeNode in="d"/><feMergeNode in="dk2"/><feMergeNode in="lt2"/></feMerge>
-      </filter>
-      <filter id="bz-fur-s" x="-20%" y="-20%" width="140%" height="140%">
-        <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="1" seed="9" result="t"/>
-        <feDisplacementMap in="SourceGraphic" in2="t" scale="2.2" xChannelSelector="R" yChannelSelector="G"/>
-      </filter>
-      <filter id="bz-blur" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="1.1"/></filter>
-      <filter id="bz-soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation=".45"/></filter>
-      <filter id="bz-drop" x="-30%" y="-30%" width="160%" height="170%" color-interpolation-filters="sRGB">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="2.6"/>
-        <feOffset dy="6" result="b"/>
-        <feFlood flood-color="#2b1f05" flood-opacity=".3"/>
-        <feComposite in2="b" operator="in"/>
-        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <path id="bz-fw" d="M47 38 C39 30 23 18 11 18 C4 18 3 25 9 29 C19 35 35 38 47 40 Z"/>
-      <path id="bz-hw" d="M47 41 C39 41 27 41 20 44 C15 47 17 52 23 51 C32 50 41 46 48 43 Z"/>
-      <g id="bz-wings">
-        <use href="#bz-fw" fill="url(#bz-wing)" stroke="#fffdf0" stroke-opacity=".55" stroke-width=".5"/>
-        <use href="#bz-hw" fill="url(#bz-wing)" stroke="#fffdf0" stroke-opacity=".45" stroke-width=".45"/>
-        <path d="M46 39 C36 32 24 24 13 21 M46 39 C37 35 26 31 16 28 M33 31 C31 33 30 34 30 36 M25 27 C23 29 23 31 24 33 M46 42 C38 43 30 44 22 47"
-              fill="none" stroke="#5a4a25" stroke-opacity=".38" stroke-width=".45" stroke-linecap="round"/>
-      </g>
-      <clipPath id="bz-abd-clip"><ellipse cx="4" cy="0" rx="19" ry="14.5"/></clipPath>
-    </defs>
-  </svg>
 </main>
 <div class="film" aria-hidden="true">
   <div class="grain"></div>
@@ -231,82 +151,19 @@
 </div>
 
 <script>
-  // To add an app: add an entry here. `owner` shows next to its bee on hover/focus.
+  // To add an app: add an entry here. `owner` shows under its bee on hover/focus.
   const APPS = [
-    { name: "room planner", url: "/room-planner/", owner: "rino21111" },
+    { name: "Apartment Designer", url: "https://isebelle.github.io/rino21111.github.io/", owner: "Isebelle" },
     { name: "progressions", url: "/progressions/", owner: "rino21111" },
     { name: "chrono trader", url: "/chrono_trader/", owner: "rino21111" },
   ];
 
-  // one bee, three-quarter front view, hovering. Shapes share the gradients and
-  // filters in .bee-defs; the two crisp wings are separate layers so their fast
-  // flutter never repaints the furry (filtered) body.
-  const WING = side => `<svg class="wing ${side}" viewBox="0 0 120 104" aria-hidden="true" focusable="false">
-      <g${side === "r" ? ' transform="translate(120 1) scale(-.93 .97)"' : ""}><use href="#bz-wings"/></g></svg>`;
-  const BODY = `<svg class="body" viewBox="0 0 120 104" aria-hidden="true" focusable="false">
-    <g filter="url(#bz-drop)">
-      <g opacity=".22" filter="url(#bz-blur)">
-        <use href="#bz-fw" fill="#f7f3e0" transform="rotate(-24 47 38)"/>
-        <use href="#bz-fw" fill="#f7f3e0" transform="rotate(14 47 38)"/>
-        <g transform="translate(120 1) scale(-.93 .97)">
-          <use href="#bz-fw" fill="#f7f3e0" transform="rotate(-24 47 38)"/>
-          <use href="#bz-fw" fill="#f7f3e0" transform="rotate(14 47 38)"/>
-        </g>
-      </g>
-      <g fill="none" stroke="#24190a" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M66 64 L73 80 L69 92" stroke-width="2.1"/>
-        <path d="M77 62 L87 77 L85 90" stroke-width="2.1"/>
-      </g>
-      <ellipse cx="70.5" cy="83" rx="3.6" ry="4.6" fill="url(#bz-pollen)" filter="url(#bz-fur-s)"/>
-      <ellipse cx="86.8" cy="80.5" rx="3.3" ry="4.3" fill="url(#bz-pollen)" filter="url(#bz-fur-s)"/>
-      <g transform="translate(75 67) rotate(34)" filter="url(#bz-fur-s)">
-        <ellipse cx="4" cy="0" rx="19" ry="14.5" fill="url(#bz-abd)"/>
-        <g clip-path="url(#bz-abd-clip)" fill="none" stroke="#24190a" stroke-opacity=".93">
-          <path d="M0 -16 Q5 0 0 16" stroke-width="5"/>
-          <path d="M9 -16 Q13.5 0 9 16" stroke-width="5"/>
-          <path d="M17.5 -16 Q21 0 17.5 16" stroke-width="5"/>
-        </g>
-        <ellipse cx="4" cy="0" rx="19" ry="14.5" fill="url(#bz-shade)"/>
-        <path d="M22.5 -1.5 L26 0 L22.5 1.5 Z" fill="#24190a"/>
-      </g>
-      <g filter="url(#bz-fur)">
-        <circle cx="60" cy="45" r="19" fill="url(#bz-thorax)"/>
-        <path d="M45 37 Q60 28 75 36 Q72 41 60 40 Q48 41 45 37 Z" fill="#2a1d08" fill-opacity=".72"/>
-      </g>
-      <g fill="none" stroke="#24190a" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M51 63 L44 73 L45 84" stroke-width="1.9"/>
-        <path d="M69 62 L76 72 L75 82" stroke-width="1.9"/>
-        <path d="M50 66 L47 72 L50 77" stroke-width="1.7"/>
-        <path d="M62 67 L65 73 L62 78" stroke-width="1.7"/>
-      </g>
-      <g filter="url(#bz-fur-s)">
-        <path d="M41.5 51 C41 42 69 41 68.5 50 C68.5 60 62 70.5 55 71.5 C48 70.5 41.5 60 41.5 51 Z" fill="url(#bz-head)"/>
-        <ellipse cx="55" cy="47.5" rx="7.5" ry="4" fill="#c99b45" fill-opacity=".75"/>
-      </g>
-      <ellipse cx="55.5" cy="64" rx="4.2" ry="3.6" fill="#4a3718"/>
-      <path d="M52.5 70 Q53.5 73 55 72.6 M57.5 70 Q56.6 73 55.2 72.6" fill="none" stroke="#7a5420" stroke-width="1.1" stroke-linecap="round"/>
-      <ellipse cx="45.6" cy="55.5" rx="4.6" ry="8.6" transform="rotate(14 45.6 55.5)" fill="url(#bz-eye)"/>
-      <ellipse cx="64.6" cy="54.8" rx="5.3" ry="9" transform="rotate(-13 64.6 54.8)" fill="url(#bz-eye)"/>
-      <g fill="#fff8de" filter="url(#bz-soft)">
-        <rect x="43.6" y="48.6" width="3.4" height="1.5" rx=".7" transform="rotate(-8 45 49)" opacity=".85"/>
-        <rect x="62.2" y="47.7" width="4" height="1.6" rx=".8" transform="rotate(10 64 48.5)" opacity=".9"/>
-        <ellipse cx="46.8" cy="60" rx=".9" ry="1.6" opacity=".25"/>
-        <ellipse cx="66.6" cy="59.5" rx="1" ry="1.8" opacity=".25"/>
-      </g>
-      <g fill="none" stroke="#1d1407" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M53 49 Q50.5 43 49.5 37.5 L42.5 31" stroke-width="1.5"/>
-        <path d="M57.5 49 Q59.5 43 61 37.5 L69 30.5" stroke-width="1.5"/>
-        <path d="M43.6 32 L42 30.6 M68 31.4 L69.8 29.8" stroke-width="2.4"/>
-      </g>
-    </g>
-  </svg>`;
-
   const grid = document.getElementById("apps");
   APPS.forEach((app, i) => {
     const li = document.createElement("li");
-    li.innerHTML = `<a class="card"><span class="lift"><span class="wander"><span class="bee">
-        ${WING("l")}${WING("r")}${BODY}</span></span></span>
-      <h2 class="name"></h2><span class="owner"></span></a>`;
+    li.innerHTML = `<a class="card"><span class="wander"><span class="bee">
+        <span class="wing l"></span><h2 class="name"></h2><span class="wing r"></span>
+      </span></span><span class="owner"></span></a>`;
     li.querySelector("a").href = app.url;
     li.querySelector(".name").textContent = app.name;
     li.querySelector(".owner").textContent = app.owner;
