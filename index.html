@@ -7,50 +7,58 @@
 <meta property="og:title" content="beehive">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://rino21111.github.io/">
-<meta name="theme-color" content="#cdbb62">
+<meta name="theme-color" content="#b9a75c">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐝</text></svg>">
 <style>
   :root {
     color-scheme: light;
-    --wall: #cdbb62;
     --ink: #3b3214;
     --bee-gold: #f2c230;
     --bee-dark: #2a2208;
   }
   * { box-sizing: border-box; }
-  html { min-height: 100%; }
+  html { min-height: 100%; background: #a59352; }
   body {
     margin: 0;
     min-height: 100vh;
+    overflow-x: hidden;
     color: var(--ink);
     font: 15px/1.4 ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-    background-color: var(--wall);
-    background-image:
-      radial-gradient(ellipse 90% 55% at 50% -10%, rgba(255, 252, 225, .55), transparent 70%),
-      radial-gradient(ellipse 120% 60% at 50% 115%, rgba(70, 55, 5, .35), transparent 70%),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='64'%3E%3Cg fill='none' stroke='%23826c1e' stroke-opacity='.22'%3E%3Cpath d='M1 0v64M47 0v64'/%3E%3Cpath d='M24 8l7 8-7 8-7-8z'/%3E%3Cpath d='M24 40l7 8-7 8-7-8z' stroke-opacity='.12'/%3E%3C/g%3E%3C/svg%3E");
-    background-attachment: fixed, fixed, scroll;
+    /* what shows before the room has been drawn (and if scripts are off) */
+    background:
+      radial-gradient(ellipse 80% 40% at 50% 12%, rgba(240, 232, 190, .5), transparent 70%),
+      linear-gradient(#d3c899 0, #c6b67a 30%, #bba45d 48%, #a38e52 68%, #7c6a3c 100%);
+    background-attachment: fixed;
   }
-  /* the fluorescent hum: a faint wash that dips now and then */
-  body::before {
-    content: "";
-    position: fixed; inset: 0;
-    pointer-events: none;
-    background: rgba(255, 255, 235, .07);
-    animation: flicker 9s infinite;
-  }
-  @keyframes flicker {
-    0%, 91%, 93%, 95.5%, 100% { opacity: 1; }
-    92% { opacity: .2; }
-    95% { opacity: .5; }
-  }
-  @media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
 
-  main { max-width: 880px; margin: 0 auto; padding: 40px 16px 64px; }
+  /* ---- the room: drawn once into a canvas, then film grain, lens falloff, hum ---- */
+  .room { position: fixed; left: 0; top: 0; width: 100%; height: 100vh; height: 100lvh; pointer-events: none; overflow: hidden; }
+  .room canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .9s ease; }
+  .room canvas.on { opacity: 1; }
+  .room .grain { position: absolute; inset: 0; opacity: .2; mix-blend-mode: overlay; background-size: 192px 192px; }
+  .room .falloff {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 75% 70% at 50% 46%, transparent 52%, rgba(34, 26, 4, .38) 100%),
+      linear-gradient(transparent 68%, rgba(34, 26, 4, .16));
+  }
+  /* the fluorescent hum: once in a while the tubes sag for a moment */
+  .room .hum { position: absolute; inset: 0; background: #1c1604; opacity: 0; animation: hum 14s infinite; }
+  @keyframes hum {
+    0%, 81%, 82.6%, 84.4%, 100% { opacity: 0; }
+    81.4% { opacity: .07; }
+    83.3% { opacity: .1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .room canvas { transition: none; }
+    .room .hum { animation: none; }
+  }
+
+  main { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 40px 16px 64px; }
   .mark {
-    margin: 0 0 40px;
+    margin: 0 0 max(40px, calc(42vh - 70px));
     font-size: 14px; font-weight: 500; letter-spacing: .25em;
-    color: rgba(59, 50, 20, .4);
+    color: rgba(59, 50, 20, .45);
     text-align: center;
   }
   .grid {
@@ -137,11 +145,17 @@
   }
   .owner {
     position: absolute; right: 10px; bottom: 7px;
-    font-size: 11px; color: rgba(59, 50, 20, .45);
+    font-size: 11px; color: rgba(52, 43, 14, .62);
   }
 </style>
 </head>
 <body>
+<div class="room" aria-hidden="true">
+  <canvas id="room"></canvas>
+  <div class="grain"></div>
+  <div class="falloff"></div>
+  <div class="hum"></div>
+</div>
 <main>
   <p class="mark">beehive</p>
   <ul class="grid" id="apps"></ul>
@@ -169,6 +183,674 @@
     wander.style.setProperty("--wd", `${6.5 + 1.1 * (i % 4)}s`);
     grid.append(li);
   });
+</script>
+
+<script>
+/* Level 0, ray-traced once into the canvas behind everything (and again on resize).
+   A grid of drywall with doorways, drop-ceiling tiles, fluorescent troffers with
+   occluded soft light, damp carpet, haze, bloom and sensor noise. No network. */
+(() => {
+  "use strict";
+  const cvs = document.getElementById("room");
+  const ctx = cvs.getContext("2d", { alpha: false });
+
+  // ---------------- small helpers ----------------
+  const sat = v => (v < 0 ? 0 : v > 1 ? 1 : v);
+  const sstep = (a, b, v) => { v = sat((v - a) / (b - a)); return v * v * (3 - 2 * v); };
+  function hash(x, y) {
+    let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul((y | 0) + 0x9e3779b9, 0x165667b1);
+    h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  function noise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    let fx = x - ix, fy = y - iy;
+    fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+    const a = hash(ix, iy), b = hash(ix + 1, iy), c = hash(ix, iy + 1), d = hash(ix + 1, iy + 1);
+    return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+  }
+  // fractal noise; octaves finer than the pixel footprint `fp` fade to their mean
+  function fbm(x, y, oct, fp) {
+    let s = 0, a = 0.5, f = 1, n = 0;
+    for (let i = 0; i < oct; i++) {
+      const k = sat(1.5 - fp * f * 2);
+      s += a * (k * noise(x * f + i * 31.7, y * f - i * 17.3) + (1 - k) * 0.5);
+      n += a; a *= 0.5; f *= 2.03;
+    }
+    return s / n;
+  }
+  // box-filtered coverage of a line of half-width hw at signed distance d, footprint fp
+  function cover(d, hw, fp) {
+    const a = Math.max(d - fp * 0.5, -hw), b = Math.min(d + fp * 0.5, hw);
+    return b > a ? (b - a) / fp : 0;
+  }
+  // the same for lines repeating every P
+  function lines(x, P, hw, fp) {
+    const avg = (2 * hw) / P;
+    if (fp >= P) return avg;
+    const c = cover(x - Math.round(x / P) * P, hw, fp);
+    const k = (fp / P) * (fp / P);
+    return c * (1 - k) + avg * k;
+  }
+
+  // ---------------- the floor plan ----------------
+  const C = 0.25, MW = 240, MD = 240, OX = 120, OZ = 48;    // cells are 25cm; world x = (cell - OX) * C
+  const HC = 2.62, DT = 2.1, EYE = 1.5;                       // ceiling, doorway head, camera height
+  const grid = new Uint8Array(MW * MD);                      // 0 open, 1 wall, 2 doorway (wall above DT)
+  let seed = 20211;
+  const rng = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const set = (cx, cz, v) => { if (cx >= 0 && cz >= 0 && cx < MW && cz < MD) grid[cz * MW + cx] = v; };
+  const cellOf = (w, o) => Math.round(w / C) + o;
+  const run = (vert, line, a, b, v) => { for (let k = a; k <= b; k++) vert ? set(line, k, v) : set(k, line, v); };
+
+  function edge(vert, line, a, b, type) {
+    if (type === 0) return;                              // nothing
+    run(vert, line, a, b, 1);
+    if (type === 2) {                                    // a doorway
+      const w = 4 + (rng() < 0.35 ? 1 : 0);
+      const lo = a + 3, hi = b - 3 - w;
+      if (hi >= lo) { const s = lo + Math.floor(rng() * (hi - lo + 1)); run(vert, line, s, s + w - 1, 2); }
+    } else if (type === 3) {                             // a stub: wall that just stops
+      const L = Math.round((b - a) * (0.3 + rng() * 0.35));
+      if (rng() < 0.5) run(vert, line, a + L, b, 0); else run(vert, line, a, b - L, 0);
+    } else if (type === 4) {                             // a wide opening, full height
+      const w = 6 + Math.floor(rng() * 5), lo = a + 2, hi = b - 2 - w;
+      if (hi >= lo) { const s = lo + Math.floor(rng() * (hi - lo + 1)); run(vert, line, s, s + w - 1, 0); }
+    }
+  }
+  const pick = () => { const r = rng(); return r < 0.2 ? 0 : r < 0.38 ? 1 : r < 0.72 ? 2 : r < 0.88 ? 3 : 4; };
+
+  const XL = [], ZL = [];
+  for (let x = -3.5; x > -29; x -= 3.9 + rng() * 2.1) XL.unshift(cellOf(x, OX));
+  for (let x = 1.75; x < 29; x += 3.9 + rng() * 2.1) XL.push(cellOf(x, OX));
+  for (let z = -2.5; z > -11; z -= 4 + rng() * 2) ZL.unshift(cellOf(z, OZ));
+  for (let z = 5.0; z < 46; z += 3.9 + rng() * 2.1) ZL.push(cellOf(z, OZ));
+  const xi0 = XL.indexOf(cellOf(-3.5, OX)), zi0 = ZL.indexOf(cellOf(5.0, OZ));
+  const over = {                                         // hand-placed walls around the camera
+    [`v${xi0},${zi0 - 1}`]: 2,     // left of camera: a doorway
+    [`v${xi0 + 1},${zi0 - 1}`]: 0, // right of camera: open into the next room
+    [`h${xi0 + 1},${zi0 - 1}`]: 1,
+    [`h${xi0},${zi0}`]: 2,         // ahead: a doorway
+    [`h${xi0 + 1},${zi0}`]: 1,
+    [`h${xi0},${zi0 - 1}`]: 1,     // behind
+  };
+  for (let i = 0; i < XL.length; i++) for (let j = 0; j + 1 < ZL.length; j++) {
+    const k = `v${i},${j}`, t = pick();
+    edge(true, XL[i], ZL[j], ZL[j + 1], k in over ? over[k] : t);
+  }
+  for (let j = 0; j < ZL.length; j++) for (let i = 0; i + 1 < XL.length; i++) {
+    const k = `h${i},${j}`, t = pick();
+    edge(false, ZL[j], XL[i], XL[i + 1], k in over ? over[k] : t);
+  }
+  // the near field is laid out by hand so the first view has depth
+  const box = (x0, z0, x1, z1, v) => {
+    for (let cz = cellOf(z0, OZ); cz <= cellOf(z1, OZ); cz++) for (let cx = cellOf(x0, OX); cx <= cellOf(x1, OX); cx++) set(cx, cz, v);
+  };
+  box(-3.25, -2.25, 9.5, 13.25, 0);
+  box(-3.5, -2.5, -3.5, 5.0, 1);          // left wall
+  box(-3.5, -2.5, 9.5, -2.5, 1);          // behind
+  box(-3.5, 5.0, 1.2, 5.0, 1);            // ahead, with a doorway, stopping short on the right
+  box(-1.3, 5.0, -0.3, 5.0, 2);
+  box(1.2, 5.0, 1.2, 7.6, 1);             // ...and turning away
+  box(-3.5, 10.5, 9.5, 10.5, 1);          // the far wall, two doorways
+  box(2.5, 10.5, 3.5, 10.5, 2);
+  box(-1.5, 10.5, -0.5, 10.5, 2);
+  box(5.75, 10.5, 6.75, 10.5, 2);
+  box(-3.5, 5.0, -3.5, 13.5, 1);
+  box(7.0, 3.0, 7.0, 10.5, 1);            // right side wall, a doorway through it
+  box(7.0, 6.2, 7.0, 7.2, 2);
+  box(-3.5, 13.5, 9.5, 13.5, 1);
+  box(-1.0, 13.5, 0.0, 13.5, 2);
+  box(-3.5, 7.75, -1.75, 7.75, 1);        // a short partition behind the first doorway
+  const cellAt = (cx, cz) => (cx < 0 || cz < 0 || cx >= MW || cz >= MD ? 1 : grid[cz * MW + cx]);
+
+  // ---------------- the lights: 2x4 troffers on a 2.4m lattice ----------------
+  const LS = 2.4, LZ0 = 1.2, LI0 = -12, LJ0 = -4, LN = 25, LM = 22;
+  const lampI = new Float32Array(LN * LM), lampG = new Float32Array(LN * LM), lampP = new Uint8Array(LN * LM);
+  for (let i = 0; i < LN; i++) for (let j = 0; j < LM; j++) {
+    const lx = (i + LI0) * LS, lz = LZ0 + (j + LJ0) * LS;
+    let ok = true;
+    for (let x = lx - 0.25; x <= lx + 0.25 && ok; x += 0.25)
+      for (let z = lz - 0.25; z <= lz + 0.25 && ok; z += 0.25)
+        if (cellAt(Math.floor(x / C + OX), Math.floor(z / C + OZ))) ok = false;
+    if (!ok) continue;
+    lampP[i * LM + j] = 1;
+    const r = hash(i * 7 + 3, j * 13 + 5);
+    lampI[i * LM + j] = r < 0.06 || (i === 11 && j === 5) ? 0 : (0.9 + 0.2 * hash(i, j)) * (r < 0.1 ? 0.45 : 1);
+    lampG[i * LM + j] = hash(j + 11, i + 29) - 0.5;
+  }
+
+  // 2D line of sight in the plan, from (ax,ay,az) up to a lamp at (bx,by,bz)
+  function los(ax, ay, az, bx, by, bz) {
+    const gx0 = ax / C + OX, gz0 = az / C + OZ, gx1 = bx / C + OX, gz1 = bz / C + OZ;
+    let cx = Math.floor(gx0), cz = Math.floor(gz0);
+    const ddx = gx1 - gx0, ddz = gz1 - gz0;
+    const sx = ddx > 0 ? 1 : -1, sz = ddz > 0 ? 1 : -1;
+    const tdx = ddx !== 0 ? Math.abs(1 / ddx) : 1e30, tdz = ddz !== 0 ? Math.abs(1 / ddz) : 1e30;
+    let tmx = ddx > 0 ? (cx + 1 - gx0) * tdx : (gx0 - cx) * tdx;
+    let tmz = ddz > 0 ? (cz + 1 - gz0) * tdz : (gz0 - cz) * tdz;
+    let n = Math.abs(Math.floor(gx1) - cx) + Math.abs(Math.floor(gz1) - cz);
+    const dy = by - ay;
+    while (n-- > 0) {
+      let s;
+      if (tmx < tmz) { s = tmx; cx += sx; tmx += tdx; } else { s = tmz; cz += sz; tmz += tdz; }
+      const v = grid[cz * MW + cx];
+      if (v === 1) return false;
+      if (v === 2) {
+        const se = tmx < tmz ? tmx : tmz;
+        if (ay + dy * s > DT || ay + dy * (se > 1 ? 1 : se) > DT) return false;
+      }
+    }
+    return true;
+  }
+
+  // ---------------- light on the carpet, with real shadows (precomputed per cell) ----------------
+  const lm = new Float32Array(MW * MD), lmb = new Float32Array(MW * MD);
+  const LR = 6.2, H2 = HC * HC;
+  function bakeRow(cz) {
+    for (let cx = 20; cx < MW - 20; cx++) {
+      if (grid[cz * MW + cx]) continue;
+      const x = (cx + 0.5 - OX) * C, z = (cz + 0.5 - OZ) * C;
+      let E = 0;
+      const i0 = Math.max(0, Math.ceil((x - LR) / LS) - LI0), i1 = Math.min(LN - 1, Math.floor((x + LR) / LS) - LI0);
+      const j0 = Math.max(0, Math.ceil((z - LR - LZ0) / LS) - LJ0), j1 = Math.min(LM - 1, Math.floor((z + LR - LZ0) / LS) - LJ0);
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+        const I = lampI[i * LM + j];
+        if (!I) continue;
+        const lx = (i + LI0) * LS, lzc = LZ0 + (j + LJ0) * LS;
+        for (let s = -1; s <= 1; s += 2) {
+          const lz = lzc + 0.3 * s, ddx = lx - x, ddz = lz - z, h2 = ddx * ddx + ddz * ddz;
+          if (h2 > LR * LR) continue;
+          const d2 = h2 + H2, w = 0.5 * I * H2 * H2 / (d2 * d2);
+          if (w > 0.004 && los(x, 0, z, lx, HC, lz)) E += w;
+        }
+      }
+      lm[cz * MW + cx] = E;
+    }
+  }
+  function finishLightmap() {
+    // walls take the mean of their open neighbours so sampling near them doesn't sink to black
+    for (let pass = 0; pass < 2; pass++) for (let cz = 1; cz < MD - 1; cz++) for (let cx = 1; cx < MW - 1; cx++) {
+      const k = cz * MW + cx;
+      if (!grid[k] || lm[k]) continue;
+      let s = 0, n = 0;
+      for (const o of [1, -1, MW, -MW]) { const v = lm[k + o]; if (v) { s += v; n++; } }
+      if (n) lm[k] = s / n;
+    }
+    // a wide blur of it stands in for the light bouncing around
+    lmb.set(lm);
+    const tmp = new Float32Array(MW * MD), R = 4;
+    for (let it = 0; it < 2; it++) {
+      for (let cz = 0; cz < MD; cz++) { let acc = 0; const row = cz * MW;
+        for (let cx = -R; cx < MW; cx++) {
+          if (cx + R < MW) acc += lmb[row + cx + R];
+          if (cx - R - 1 >= 0) acc -= lmb[row + cx - R - 1];
+          if (cx >= 0) tmp[row + cx] = acc / (2 * R + 1);
+        } }
+      for (let cx = 0; cx < MW; cx++) { let acc = 0;
+        for (let cz = -R; cz < MD; cz++) {
+          if (cz + R < MD) acc += tmp[(cz + R) * MW + cx];
+          if (cz - R - 1 >= 0) acc -= tmp[(cz - R - 1) * MW + cx];
+          if (cz >= 0) lmb[cz * MW + cx] = acc / (2 * R + 1);
+        } }
+    }
+  }
+  function sample(arr, x, z) {
+    const gx = x / C + OX - 0.5, gz = z / C + OZ - 0.5;
+    const ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz;
+    if (ix < 0 || iz < 0 || ix >= MW - 1 || iz >= MD - 1) return 0;
+    const k = iz * MW + ix;
+    return (arr[k] * (1 - fx) + arr[k + 1] * fx) * (1 - fz) + (arr[k + MW] * (1 - fx) + arr[k + MW + 1] * fx) * fz;
+  }
+  // distance from a floor/ceiling point to the nearest wall face (for corner darkening)
+  function wallDist(x, z) {
+    const gx = x / C + OX, gz = z / C + OZ, cx = Math.floor(gx), cz = Math.floor(gz);
+    let best = 0.6;
+    for (let oz = -2; oz <= 2; oz++) for (let ox = -2; ox <= 2; ox++) {
+      if (!cellAt(cx + ox, cz + oz)) continue;
+      const qx = Math.max(cx + ox - gx, 0, gx - (cx + ox + 1)), qz = Math.max(cz + oz - gz, 0, gz - (cz + oz + 1));
+      const d = Math.sqrt(qx * qx + qz * qz) * C;
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
+  // ---------------- surfaces ----------------
+  let ar, ag, ab;              // albedo out
+  let er, eg, eb;              // emission out
+  const TILE = 0.6;
+
+  function wallpaper(u, y, fp) {
+    // dull mustard with a faint double pinstripe and a small faded lozenge between,
+    // hung in 53cm strips that never quite line up
+    const si = Math.floor(u / 0.53);
+    let m = 0.985 + 0.03 * hash(si, 77);
+    m -= 0.07 * lines(u, 0.53, 0.0012, fp);
+    u += 0.035 * hash(si, 78);
+    const P = 0.11;
+    m -= 0.16 * lines(u, P, 0.0025, fp);
+    m -= 0.12 * lines(u - 0.007, P, 0.0013, fp);
+    const su = u / P, fu = su - Math.floor(su);
+    // lighter band in the second half of each repeat
+    const band = sstep(0.47, 0.53, fu) * (1 - sstep(0.94, 0.99, fu));
+    const fadeBand = sat(1.2 - fp / (P * 0.45));
+    m += 0.06 * (band * fadeBand + 0.5 * (1 - fadeBand));
+    // motif: little lozenges up the dark band
+    const fadeMotif = sat(1.3 - fp / 0.009);
+    if (fadeMotif > 0) {
+      const vy = y / 0.095, row = Math.floor(vy), fy = vy - row - 0.5;
+      const dx = (fu - 0.25) * P, dyy = fy * 0.095;
+      const dd = Math.abs(dx) / 0.016 + Math.abs(dyy) / 0.026;
+      m -= 0.06 * fadeMotif * (1 - sstep(0.75, 1.05, dd)) * (0.6 + 0.4 * sstep(0.45, 0.7, dd));
+    }
+    m -= 0.03 * (1 - fadeMotif) * 0.15;
+    // age: broad unevenness, yellowing high up, grime low down
+    const big = fbm(u * 0.45, y * 0.6, 4, fp * 0.45);
+    m *= 0.83 + 0.34 * big;
+    let r = 0.5 * m, g = 0.398 * m, b = 0.118 * m;
+    const low = 1 - sstep(0.05, 0.45, y);
+    const grime = low * (0.55 + 0.45 * fbm(u * 3.1, y * 6, 3, fp * 6));
+    r *= 1 - 0.22 * grime; g *= 1 - 0.25 * grime; b *= 1 - 0.32 * grime;
+    // water stains: streaks running down from the ceiling and rising damp
+    const st = fbm(u * 0.85 + 13.1, y * 0.32, 4, fp * 0.85) + 0.06 * (fbm(u * 6, y * 3, 2, fp * 6) - 0.5);
+    const thr = 0.66 - 0.16 * sstep(1.4, HC, y) - 0.12 * (1 - sstep(0.0, 0.6, y));
+    const inside = sstep(thr, thr + 0.02, st), rim = sstep(thr - 0.012, thr, st) * (1 - sstep(thr + 0.008, thr + 0.03, st));
+    const sm = 1 - 0.08 * inside - 0.1 * rim;
+    r *= sm; g *= sm * 0.985; b *= sm * 0.93 - 0.02 * inside;
+    // baseboard and ceiling trim
+    if (y < 0.1) {
+      const lip = cover(y - 0.093, 0.006, fp);
+      const t = 0.62 + 0.3 * lip;
+      r = 0.34 * t; g = 0.27 * t; b = 0.11 * t;
+    } else if (y > HC - 0.03) { r = 0.6; g = 0.56; b = 0.42; }
+    ar = r; ag = g; ab = b < 0 ? 0 : b;
+  }
+
+  function carpet(x, z, fp) {
+    let m = 1;
+    m += 0.2 * (sat(1.4 - fp * 60) * (noise(x * 60, z * 60) - 0.5));
+    m += 0.2 * (sat(1.4 - fp * 16) * (fbm(x * 16 + 5, z * 16, 2, fp * 16) - 0.5));
+    m += 0.12 * (sat(1.4 - fp * 4) * (noise(x * 4 - 9, z * 2.5) - 0.5));
+    m *= 0.8 + 0.4 * fbm(x * 0.55, z * 0.55, 3, fp * 0.55);
+    const dn = fbm(x * 0.33 + 41, z * 0.33 - 7, 5, fp * 0.33);
+    const damp = sstep(0.585, 0.65, dn), drim = sstep(0.58, 0.592, dn) * (1 - sstep(0.592, 0.63, dn));
+    m *= 1 - 0.17 * damp - 0.05 * drim;
+    const spot = sstep(0.74, 0.8, fbm(x * 1.7 - 3, z * 1.7 + 9, 3, fp * 1.7));
+    m *= 1 - 0.12 * spot;
+    m *= 1 - 0.14 * lines(x - 0.41, 3.66, 0.006, fp);       // carpet seam
+    ar = 0.195 * m; ag = 0.143 * m * (1 - 0.04 * damp); ab = 0.047 * m * (1 - 0.15 * damp);
+  }
+
+  // returns 0 for plain ceiling; sets albedo and emission
+  function ceiling(x, z, fp) {
+    er = eg = eb = 0;
+    // which lamp lattice slot are we near?
+    const li = Math.round(x / LS), lj = Math.round((z - LZ0) / LS);
+    const lx = li * LS, lz = LZ0 + lj * LS;
+    const ii = li - LI0, jj = lj - LJ0;
+    const I = ii >= 0 && jj >= 0 && ii < LN && jj < LM ? lampI[ii * LM + jj] : 0;
+    const lit = ii >= 0 && jj >= 0 && ii < LN && jj < LM && lampP[ii * LM + jj] === 1;
+    const qx = Math.abs(x - lx), qz = Math.abs(z - lz);
+    const inPanel = qx < 0.3 && qz < 0.6;
+    // T-bar grid
+    const tb = Math.max(lines(x + 0.3, TILE, 0.014, fp), lines(z, TILE, 0.014, fp));
+    if (inPanel && lit) {
+      const fr = Math.max(0.3 - qx, 0) < 0.035 || 0.6 - qz < 0.035;
+      if (fr) { ar = 0.62; ag = 0.61; ab = 0.55; }
+      else {
+        // prismatic diffuser over three tubes
+        const tubes = Math.max(cover(x - lx + 0.13, 0.025, Math.max(fp, 0.04)), cover(x - lx, 0.025, Math.max(fp, 0.04)), cover(x - lx - 0.13, 0.025, Math.max(fp, 0.04)));
+        const edge = sstep(0.0, 0.09, Math.min(0.265 - qx, 0.565 - qz));
+        const k = I > 0 ? I : 0.04;
+        const e = k * 14 * (0.55 + 0.45 * edge) * (0.9 + 0.25 * tubes);
+        const g = lampG[ii * LM + jj];
+        er = e * (0.95 - 0.05 * g); eg = e; eb = e * (0.86 + 0.05 * g);
+        ar = 0.55; ag = 0.56; ab = 0.5;
+      }
+      if (tb > 0) { const t = 1 - tb; er *= t; eg *= t; eb *= t; ar = ar * t + 0.6 * tb; ag = ag * t + 0.58 * tb; ab = ab * t + 0.48 * tb; }
+      return 1;
+    }
+    // a tile: yellowed mineral fibre with fissures, some stained, a few replaced
+    const tx = Math.floor((x + 0.3) / TILE), tz = Math.floor(z / TILE);
+    const fx = (x + 0.3) / TILE - tx, fz = z / TILE - tz;
+    const h = hash(tx + 500, tz + 900);
+    let m = 0.95 + 0.08 * hash(tx, tz);
+    let r = 0.6 * m, g = 0.54 * m, b = 0.3 * m;
+    if (h > 0.93) { r *= 1.07; g *= 1.08; b *= 1.18; }               // newer replacement tile
+    const fis = sat(1.4 - fp * 120) * sstep(0.62, 0.8, noise(x * 120, z * 120));
+    const spec = 1 - 0.18 * fis;
+    r *= spec; g *= spec; b *= spec;
+    const bev = sstep(0.0, 0.05, Math.min(fx, 1 - fx, fz, 1 - fz));   // tegular edge shadow
+    const bv = 0.8 + 0.2 * bev; r *= bv; g *= bv; b *= bv;
+    if (h < 0.07) {                                                   // water stain
+      const cx = 0.25 + 0.5 * hash(tx + 7, tz + 3), cz = 0.25 + 0.5 * hash(tx + 1, tz + 8);
+      const rad = 0.07 + 0.14 * hash(tx + 4, tz + 4);
+      const dx = (fx - cx), dz = (fz - cz);
+      const d = Math.sqrt(dx * dx + dz * dz) / rad + 0.5 * (fbm(x * 9 + tx, z * 9, 3, fp * 9) - 0.5);
+      const inside = 1 - sstep(0.9, 1.0, d), ring = sstep(0.82, 0.95, d) * (1 - sstep(0.97, 1.05, d));
+      r *= 1 - 0.05 * inside - 0.1 * ring; g *= 1 - 0.07 * inside - 0.13 * ring; b *= 1 - 0.16 * inside - 0.24 * ring;
+    }
+    if (tb > 0) { const t = 1 - tb; r = r * t + 0.52 * tb; g = g * t + 0.49 * tb; b = b * t + 0.36 * tb; }
+    ar = r; ag = g; ab = b;
+    // light spilling onto the tiles right around a panel
+    if (lit && I > 0) {
+      const ddx = Math.max(qx - 0.3, 0), ddz = Math.max(qz - 0.6, 0);
+      const dd = Math.sqrt(ddx * ddx + ddz * ddz);
+      const gl = I * 0.9 * Math.exp(-dd / 0.16);
+      er = gl * r; eg = gl * g; eb = gl * b;
+    }
+    return 0;
+  }
+
+  // ---------------- the camera and the tracer ----------------
+  let W = 0, H = 0, FOC = 1, CY = 0.5;
+  let fx_, fy_, fz_, rx_, rz_, ux_, uy_, uz_;
+  let CAM_X = 0.15, CAM_Z = -0.6;
+  let ry_ = 0;
+  function camera(yaw, pitch, roll) {
+    const cp = Math.cos(pitch), sp = Math.sin(pitch), cyw = Math.cos(yaw), syw = Math.sin(yaw);
+    fx_ = syw * cp; fy_ = sp; fz_ = cyw * cp;
+    let rx = cyw, ry = 0, rz = -syw;
+    let ux = -syw * sp, uy = cp, uz = -cyw * sp;
+    const cr = Math.cos(roll), sr = Math.sin(roll);   // a hand-held tilt
+    rx_ = rx * cr + ux * sr; ry_ = ry * cr + uy * sr; rz_ = rz * cr + uz * sr;
+    ux_ = ux * cr - rx * sr; uy_ = uy * cr - ry * sr; uz_ = uz * cr - rz * sr;
+  }
+
+  const MAXD = 46;
+  const FOG = [0.44, 0.4, 0.22];
+  // shade one ray; returns HDR rgb into the given array at index o
+  function shade(dx, dy, dz, out, o) {
+    const ox = CAM_X, oy = EYE, oz = CAM_Z;
+    const gx = ox / C + OX, gz = oz / C + OZ;
+    let cx = Math.floor(gx), cz = Math.floor(gz);
+    const stx = dx > 0 ? 1 : -1, stz = dz > 0 ? 1 : -1;
+    const tdx = dx !== 0 ? Math.abs(C / dx) : 1e30, tdz = dz !== 0 ? Math.abs(C / dz) : 1e30;
+    let tmx = dx > 0 ? (cx + 1 - gx) * tdx : (gx - cx) * tdx;
+    let tmz = dz > 0 ? (cz + 1 - gz) * tdz : (gz - cz) * tdz;
+    let tp = dy < -1e-6 ? oy / -dy : dy > 1e-6 ? (HC - oy) / dy : 1e30;
+    let kind = 0, t = MAXD, nx = 0, nz = 0;
+    if (tp < MAXD) { t = tp; kind = dy < 0 ? 1 : 2; }
+    for (;;) {
+      let tn, s;
+      if (tmx < tmz) { tn = tmx; s = 0; } else { tn = tmz; s = 1; }
+      if (tn >= t) break;
+      if (s === 0) { cx += stx; tmx += tdx; } else { cz += stz; tmz += tdz; }
+      if (cx < 0 || cz < 0 || cx >= MW || cz >= MD) { kind = 0; t = MAXD; break; }
+      const v = grid[cz * MW + cx];
+      if (v === 0) continue;
+      const y = oy + dy * tn;
+      if (v === 1 || y > DT) { kind = 3; t = tn; if (s === 0) nx = -stx; else nz = -stz; break; }
+      if (dy > 0) { const th = (DT - oy) / dy, te = tmx < tmz ? tmx : tmz; if (th < te) { kind = 4; t = th; break; } }
+    }
+    const x = ox + dx * t, y = oy + dy * t, z = oz + dz * t;
+    let r, g, b;
+    if (kind === 0) { r = FOG[0] * 0.6; g = FOG[1] * 0.6; b = FOG[2] * 0.6; }
+    else {
+      er = eg = eb = 0;
+      let E, ao = 1;
+      const fp0 = t / FOC;
+      if (kind === 1) {
+        const fp = fp0 / Math.max(-dy, 0.12);
+        carpet(x, z, fp);
+        const wd = wallDist(x, z);
+        ao = 1 - 0.5 * Math.exp(-wd / 0.22);
+        const dirt = 1 - 0.18 * Math.exp(-wd / 0.3);
+        ar *= dirt; ag *= dirt; ab *= dirt;
+        E = sample(lm, x, z) * 0.85 + 0.3 * sample(lmb, x, z) + 0.02;
+      } else if (kind === 2) {
+        const fp = fp0 / Math.max(dy, 0.12);
+        const p = ceiling(x, z, fp);
+        const wd = wallDist(x, z);
+        ao = 1 - 0.42 * Math.exp(-wd / 0.2);
+        E = p ? 0.3 : 0.55 * sample(lmb, x, z) + 0.05;
+      } else if (kind === 3) {
+        const cosi = Math.abs(nx * dx + nz * dz);
+        const fp = fp0 / Math.max(cosi, 0.12);
+        const u = nx !== 0 ? z * -nx : x * nz;
+        wallpaper(u, y, fp);
+        // direct light from lamps that can see this spot
+        let D = 0;
+        const px = x + nx * 0.02, pz = z + nz * 0.02;
+        const i0 = Math.max(0, Math.ceil((x - LR) / LS) - LI0), i1 = Math.min(LN - 1, Math.floor((x + LR) / LS) - LI0);
+        const j0 = Math.max(0, Math.ceil((z - LR - LZ0) / LS) - LJ0), j1 = Math.min(LM - 1, Math.floor((z + LR - LZ0) / LS) - LJ0);
+        for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+          const I = lampI[i * LM + j];
+          if (!I) continue;
+          const lx = (i + LI0) * LS, lz = LZ0 + (j + LJ0) * LS;
+          const Lx = lx - px, Lz = lz - pz, Ly = HC - y;
+          const ndl = nx * Lx + nz * Lz;
+          if (ndl <= 0.05) continue;
+          const d2 = Lx * Lx + Ly * Ly + Lz * Lz + 0.12;
+          const w = I * H2 * ndl * (Ly + 0.08) / (d2 * d2);
+          if (w < 0.003) continue;
+          if (los(px, y, pz, lx, HC, lz)) D += w;
+        }
+        const amb = sample(lmb, x + nx * 0.5, z + nz * 0.5);
+        E = 1.15 * D + 0.26 * amb + 0.02;
+        ao = (1 - 0.32 * Math.exp(-y / 0.2)) * (1 - 0.3 * Math.exp(-(HC - y) / 0.12));
+        // inside corners: look along the wall, one cell out, for a wall coming towards us
+        {
+          const fcx = cx + nx, fcz = cz + nz, ga = nx !== 0 ? z / C + OZ : x / C + OX, ia = Math.floor(ga);
+          let cd = 1;
+          for (let k = 1; k <= 3; k++) {
+            const a = nx !== 0 ? cellAt(fcx, ia + k) : cellAt(ia + k, fcz);
+            if (a === 1 || (a === 2 && y > DT)) { cd = Math.min(cd, (ia + k - ga) * C); break; }
+          }
+          for (let k = 1; k <= 3; k++) {
+            const a = nx !== 0 ? cellAt(fcx, ia - k) : cellAt(ia - k, fcz);
+            if (a === 1 || (a === 2 && y > DT)) { cd = Math.min(cd, (ga - (ia - k + 1)) * C); break; }
+          }
+          ao *= 1 - 0.38 * Math.exp(-cd / 0.16);
+        }
+      } else {
+        wallpaper(x + z, 2, 0.05);
+        E = 0.35 * sample(lmb, x, z) + 0.03;
+      }
+      // bounce light is tinted by all that yellow
+      E *= ao;
+      r = ar * E * 1.0 + er; g = ag * E * 0.97 + eg; b = ab * E * 0.8 + eb;
+      // haze
+      const f = Math.exp(-t * 0.028);
+      r = r * f + FOG[0] * (1 - f) * 0.55; g = g * f + FOG[1] * (1 - f) * 0.55; b = b * f + FOG[2] * (1 - f) * 0.55;
+    }
+    out[o] = r; out[o + 1] = g; out[o + 2] = b;
+  }
+
+  // ---------------- film: exposure, tone curve, grade ----------------
+  const EXPO = 1.42;
+  function tone(v) { v *= EXPO; return v * (1 + v / 20) / (1 + v); }
+
+  // ---------------- the render, sliced so the page stays responsive ----------------
+  let job = 0, hdr, ldr, baked = false;
+  function* render(myJob) {
+    const rect = cvs.getBoundingClientRect();
+    const cw = Math.max(1, rect.width), ch = Math.max(1, rect.height);
+    const budget = matchMedia("(pointer: coarse)").matches ? 340000 : 440000;
+    const sc = Math.min(Math.sqrt(budget / (cw * ch)), Math.min(window.devicePixelRatio || 1, 1.5));
+    W = Math.round(cw * sc); H = Math.round(ch * sc);
+    const aspect = W / H;
+    FOC = Math.sqrt(W * H) * (aspect > 1 ? 0.62 : 0.82);
+    CY = aspect > 1 ? 0.46 : 0.47;
+    CAM_X = aspect > 1 ? 0.15 : -0.72; CAM_Z = aspect > 1 ? -0.6 : 1.7;
+    camera(aspect > 1 ? 0.1 : 0.015, aspect > 1 ? 0.035 : 0.03, -0.007);
+
+    // bake light into the carpet (once; the building doesn't change)
+    if (!baked) {
+      for (let cz = 20; cz < MD - 20; cz++) { bakeRow(cz); if (cz % 24 === 0) yield; }
+      finishLightmap();
+      baked = true;
+      yield;
+    }
+
+    hdr = new Float32Array(W * H * 3); ldr = new Float32Array(W * H * 3);
+    const ray = (sx, sy, out, o) => {
+      const px = (sx - W * 0.5) / FOC, py = (H * CY - sy) / FOC;
+      let dx = fx_ + rx_ * px + ux_ * py, dy = fy_ + ry_ * px + uy_ * py, dz = fz_ + rz_ * px + uz_ * py;
+      const l = 1 / Math.sqrt(dx * dx + dy * dy + dz * dz);
+      shade(dx * l, dy * l, dz * l, out, o);
+    };
+    for (let py = 0; py < H; py++) {
+      for (let px = 0; px < W; px++) {
+        const o = (py * W + px) * 3;
+        ray(px + 0.5, py + 0.5, hdr, o);
+        ldr[o] = tone(hdr[o]); ldr[o + 1] = tone(hdr[o + 1]); ldr[o + 2] = tone(hdr[o + 2]);
+      }
+      if (py % 8 === 7) yield;
+    }
+    // anti-alias the edges: resample high-contrast pixels 4 more times
+    const sub = new Float32Array(3), offs = [[0.125, -0.375], [0.375, 0.125], [-0.125, 0.375], [-0.375, -0.125]];
+    const lum = new Float32Array(W * H);
+    for (let i = 0, o = 0; i < W * H; i++, o += 3) lum[i] = Math.sqrt(ldr[o] * 0.3 + ldr[o + 1] * 0.55 + ldr[o + 2] * 0.15);
+    const mark = new Uint8Array(W * H);
+    for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+      const i = py * W + px, l = lum[i];
+      if ((px + 1 < W && Math.abs(lum[i + 1] - l) > 0.06) || (py + 1 < H && Math.abs(lum[i + W] - l) > 0.06)) {
+        mark[i] = 1; if (px + 1 < W) mark[i + 1] = 1; if (py + 1 < H) mark[i + W] = 1;
+      }
+    }
+    for (let py = 0; py < H; py++) {
+      for (let px = 0; px < W; px++) {
+        const i = py * W + px;
+        if (!mark[i]) continue;
+        const o = i * 3;
+        let r = ldr[o], g = ldr[o + 1], b = ldr[o + 2];
+        for (const [ox, oy] of offs) {
+          ray(px + 0.5 + ox, py + 0.5 + oy, sub, 0);
+          r += tone(sub[0]); g += tone(sub[1]); b += tone(sub[2]);
+        }
+        ldr[o] = r / 5; ldr[o + 1] = g / 5; ldr[o + 2] = b / 5;
+      }
+      if (py % 16 === 15) yield;
+    }
+
+    // a phone camera's sharpening
+    {
+      const src = ldr.slice(), R = W * 3;
+      for (let py = 1; py < H - 1; py++) for (let px = 1; px < W - 1; px++) {
+        const o = (py * W + px) * 3;
+        for (let k = o; k < o + 3; k++) {
+          const v = src[k] + 0.5 * (src[k] - (src[k - 3] + src[k + 3] + src[k - R] + src[k + R]) * 0.25);
+          ldr[k] = v < 0 ? 0 : v;
+        }
+      }
+    }
+    yield;
+
+    // bloom: the bright tubes bleed into the haze
+    const bw = Math.ceil(W / 4), bh = Math.ceil(H / 4);
+    let bl = new Float32Array(bw * bh * 3);
+    for (let py = 0; py < H; py++) for (let px = 0; px < W; px++) {
+      const o = (py * W + px) * 3, b = ((py >> 2) * bw + (px >> 2)) * 3;
+      const L = (hdr[o] + hdr[o + 1] + hdr[o + 2]) * EXPO / 3;
+      const k = L > 1.6 ? Math.min(L - 1.6, 12) / L : 0;
+      bl[b] += hdr[o] * k / 16; bl[b + 1] += hdr[o + 1] * k / 16; bl[b + 2] += hdr[o + 2] * k / 16;
+    }
+    const blur = (src, R, passes) => {
+      const tmp = new Float32Array(src.length);
+      for (let p = 0; p < passes; p++) {
+        for (let y = 0; y < bh; y++) for (let c = 0; c < 3; c++) { let acc = 0;
+          for (let x = -R; x < bw; x++) {
+            if (x + R < bw) acc += src[(y * bw + x + R) * 3 + c];
+            if (x - R - 1 >= 0) acc -= src[(y * bw + x - R - 1) * 3 + c];
+            if (x >= 0) tmp[(y * bw + x) * 3 + c] = acc / (2 * R + 1);
+          } }
+        for (let x = 0; x < bw; x++) for (let c = 0; c < 3; c++) { let acc = 0;
+          for (let y = -R; y < bh; y++) {
+            if (y + R < bh) acc += tmp[((y + R) * bw + x) * 3 + c];
+            if (y - R - 1 >= 0) acc -= tmp[((y - R - 1) * bw + x) * 3 + c];
+            if (y >= 0) src[(y * bw + x) * 3 + c] = acc / (2 * R + 1);
+          } }
+      }
+      return src;
+    };
+    const near = blur(bl.slice(), 2, 2), wide = blur(bl, 9, 3);
+    yield;
+
+    // compose: bloom, grade, a little sensor noise, 8-bit
+    const img = ctx.createImageData(W, H), d = img.data;
+    const samp = (x, y, c) => {
+      x = Math.min(W - 1.001, Math.max(0, x)); y = Math.min(H - 1.001, Math.max(0, y));
+      const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, k = (iy * W + ix) * 3 + c;
+      return (ldr[k] * (1 - fx) + ldr[k + 3] * fx) * (1 - fy) + (ldr[k + W * 3] * (1 - fx) + ldr[k + W * 3 + 3] * fx) * fy;
+    };
+    let ns = 1234567;
+    const rnd = () => { ns ^= ns << 13; ns ^= ns >>> 17; ns ^= ns << 5; return (ns >>> 0) / 4294967296; };
+    for (let py = 0; py < H; py++) {
+      const by = Math.min(bh - 1.001, Math.max(0, (py + 0.5) / 4 - 0.5)), iy = Math.floor(by), fy = by - iy;
+      for (let px = 0; px < W; px++) {
+        const bx = Math.min(bw - 1.001, Math.max(0, (px + 0.5) / 4 - 0.5)), ix = Math.floor(bx), fx = bx - ix;
+        const o = (py * W + px) * 3, q = (iy * bw + ix) * 3, q2 = q + bw * 3;
+        const w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy), w01 = (1 - fx) * fy, w11 = fx * fy;
+        const n = rnd() - 0.5, nc = rnd() - 0.5;
+        const cax = (px - W * 0.5) * 0.0011, cay = (py - H * 0.5) * 0.0011;   // a cheap lens: colour fringes toward the corners
+        for (let c = 0; c < 3; c++) {
+          const nb = near[q + c] * w00 + near[q + 3 + c] * w10 + near[q2 + c] * w01 + near[q2 + 3 + c] * w11;
+          const wb = wide[q + c] * w00 + wide[q + 3 + c] * w10 + wide[q2 + c] * w01 + wide[q2 + 3 + c] * w11;
+          const glow = (nb * 0.22 + wb * 0.3) * EXPO * 0.5;
+          let v = c === 1 ? ldr[o + 1] : samp(px + (c === 0 ? cax : -cax), py + (c === 0 ? cay : -cay), c);
+          v = 1 - (1 - v) * (1 - Math.min(glow, 1));          // screen the glow on
+          v = Math.pow(v, 1 / 2.2);                            // to display
+          v = v * 0.75 + 0.25 * v * v * (3 - 2 * v);           // a little film contrast
+          v = 0.03 + v * 0.95;                                 // lifted blacks, like a cheap sensor
+          v *= c === 0 ? 1.02 : c === 1 ? 0.99 : 0.95;     // the sodium-ish warmth of old film
+          v += (n * 0.035 + (c === 1 ? nc : -nc) * 0.012) * (1.2 - v);
+          d[(py * W + px) * 4 + c] = v * 255 + 0.5;
+        }
+        d[(py * W + px) * 4 + 3] = 255;
+      }
+      if (py % 64 === 63) yield;
+    }
+    if (myJob !== job) return;
+    cvs.width = W; cvs.height = H;
+    ctx.putImageData(img, 0, 0);
+    cvs.classList.add("on");
+    hdr = ldr = null;
+  }
+
+  function start() {
+    const myJob = ++job;
+    const it = render(myJob);
+    const step = () => {
+      if (myJob !== job) return;
+      const until = performance.now() + 14;
+      while (performance.now() < until) { if (it.next().done) return; }
+      setTimeout(step, 0);
+    };
+    step();
+  }
+
+  // film grain tile for the overlay
+  (() => {
+    const g = document.createElement("canvas"); g.width = g.height = 192;
+    const gc = g.getContext("2d"), id = gc.createImageData(192, 192);
+    for (let i = 0; i < id.data.length; i += 4) {
+      const v = 128 + (Math.random() + Math.random() + Math.random() - 1.5) * 70;
+      id.data[i] = id.data[i + 1] = id.data[i + 2] = v; id.data[i + 3] = 255;
+    }
+    gc.putImageData(id, 0, 0);
+    document.querySelector(".room .grain").style.backgroundImage = `url(${g.toDataURL()})`;
+  })();
+
+  start();
+  let lastW = 0, lastH = 0, rt = 0;
+  lastW = innerWidth; lastH = innerHeight;
+  addEventListener("resize", () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => {
+      // phones resize a little as their toolbars slide; only redraw for real changes
+      if (Math.abs(innerWidth - lastW) < 2 && Math.abs(innerHeight - lastH) < lastH * 0.15) return;
+      lastW = innerWidth; lastH = innerHeight;
+      start();
+    }, 250);
+  });
+})();
 </script>
 </body>
 </html>
