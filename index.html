@@ -66,7 +66,7 @@
     list-style: none; margin: 0; padding: 0;
     display: flex; flex-wrap: wrap; justify-content: center; gap: 16px;
   }
-  .grid li { flex: 1 1 160px; max-width: 220px; }
+  .grid li { flex: 1 1 160px; min-width: 0; max-width: 220px; }
   .card {
     position: relative;
     display: flex; flex-direction: column; align-items: center;
@@ -127,8 +127,8 @@
   }
   .card:hover .owner, .card:focus-visible .owner { opacity: 1; transform: none; }
   @media (max-width: 420px) {
-    .name { font-size: 14px; }
-    .wing { transform: scale(.85); }
+    .grid { gap: 8px; }
+    .name { font-size: 13px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .wander, .bee, .wing { animation: none; }
